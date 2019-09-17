@@ -1,0 +1,150 @@
+package com.microsoft.cognitiveservices.speech.samples.ogg;
+
+// https://github.com/Azure-Samples/cognitive-services-speech-sdk/blob/master/samples/java/jre/console/src/com/microsoft/cognitiveservices/speech/samples/console/WavStream.java
+
+//MIT License
+//
+//Copyright (c) Microsoft Corporation. All rights reserved.
+//
+//Permission is hereby granted, free of charge, to any person obtaining a copy
+//of this software and associated documentation files (the "Software"), to deal
+//in the Software without restriction, including without limitation the rights
+//to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//copies of the Software, and to permit persons to whom the Software is
+//furnished to do so, subject to the following conditions:
+//
+//The above copyright notice and this permission notice shall be included in all
+//copies or substantial portions of the Software.
+//
+//THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//SOFTWARE
+
+import com.microsoft.cognitiveservices.speech.audio.PullAudioInputStreamCallback;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+public class WavStream extends PullAudioInputStreamCallback {
+    private final InputStream stream;
+
+    public WavStream(InputStream wavStream) {
+        try {
+            this.stream = parseWavHeader(wavStream);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(ex.getMessage());
+        }
+    }
+
+    @Override
+    public int read(byte[] dataBuffer) {
+        long ret = 0;
+
+        try {
+            ret = this.stream.read(dataBuffer, 0, dataBuffer.length);
+        } catch (Exception ex) {
+            System.out.println("Read " + ex);
+        }
+
+        return (int)Math.max(0, ret);
+    }
+
+    @Override
+    public void close() {
+        try {
+            this.stream.close();
+        } catch (IOException ex) {
+            // ignored
+        }
+    }
+    // endregion
+
+    // region Wav File helper functions
+    private int ReadInt32(InputStream inputStream) throws IOException {
+        int n = 0;
+        for (int i = 0; i < 4; i++) {
+            n |= inputStream.read() << (i * 8);
+        }
+        return n;
+    }
+
+    private long ReadUInt32(InputStream inputStream) throws IOException {
+        long n = 0;
+        for (int i = 0; i < 4; i++) {
+            n |= inputStream.read() << (i * 8);
+        }
+        return n;
+    }
+
+    private int ReadUInt16(InputStream inputStream) throws IOException {
+        int n = 0;
+        for (int i = 0; i < 2; i++) {
+            n |= inputStream.read() << (i * 8);
+        }
+        return n;
+    }
+
+    public InputStream parseWavHeader(InputStream reader) throws IOException {
+        // Note: assumption about order of chunks
+        // Tag "RIFF"
+        byte data[] = new byte[4];
+        int numRead = reader.read(data, 0, 4);
+        ThrowIfFalse((numRead == 4) && (data[0] == 'R') && (data[1] == 'I') && (data[2] == 'F') && (data[3] == 'F'), "RIFF");
+
+        // Chunk size
+        /* int fileLength = */ReadInt32(reader);
+
+        // Subchunk, Wave Header
+        // Subchunk, Format
+        // Tag: "WAVE"
+        numRead = reader.read(data, 0, 4);
+        ThrowIfFalse((numRead == 4) && (data[0] == 'W') && (data[1] == 'A') && (data[2] == 'V') && (data[3] == 'E'), "WAVE");
+
+        // Tag: "fmt"
+        numRead = reader.read(data, 0, 4);
+        ThrowIfFalse((numRead == 4) && (data[0] == 'f') && (data[1] == 'm') && (data[2] == 't') && (data[3] == ' '), "fmt ");
+
+        // chunk format size
+        long formatSize = ReadInt32(reader);
+        ThrowIfFalse(formatSize >= 16, "formatSize");
+
+        int formatTag = ReadUInt16(reader);
+        int channels = ReadUInt16(reader);
+        int samplesPerSec = (int) ReadUInt32(reader);
+        int avgBytesPerSec = (int) ReadUInt32(reader);
+        int blockAlign = ReadUInt16(reader);
+        int bitsPerSample = ReadUInt16(reader);
+        ThrowIfFalse(formatTag == 1, "PCM"); // PCM
+        ThrowIfFalse(channels == 1, "single channel");
+        ThrowIfFalse(samplesPerSec == 16000, "samples per second");
+        ThrowIfFalse(bitsPerSample == 16, "bits per sample");
+
+        // Until now we have read 16 bytes in format, the rest is cbSize and is ignored
+        // for now.
+        if (formatSize > 16) {
+            numRead = reader.read(new byte[(int) (formatSize - 16)]);
+            ThrowIfFalse(numRead == (int)(formatSize - 16), "could not skip extended format");
+        }
+
+        // Second Chunk, data
+        // tag: data.
+        numRead = reader.read(data, 0, 4);
+        ThrowIfFalse((numRead == 4) && ((data[0] == 'd') && (data[1] == 'a') && (data[2] == 't') && (data[3] == 'a')) || ((data[0] == 'L') && (data[1] == 'I') && (data[2] == 'S') && (data[3] == 'T')), "data/list");
+
+        // data chunk size
+        // Note: assumption is that only a single data chunk
+        /* int dataLength = */ReadInt32(reader);
+        return reader;
+    }
+
+    private static void ThrowIfFalse(Boolean condition, String message) {
+        if (!condition) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+    // endregion
+}
