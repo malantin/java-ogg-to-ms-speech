@@ -1,7 +1,7 @@
 # Transcribe .ogg speech files with the Microsoft Speech Java SDK
 This project demonstrates how use ffmpeg to convert .ogg files (Vorbis and Opus) to the right format for Speech-to-Text transcription using the Microsoft Cognitive Services Speech Service. This could be used to transcribe voice messages encoded using the Opus (https://en.wikipedia.org/wiki/Opus_(audio_format)) codec or other codecs using the .ogg container format.
 
-One use for this project is the transcription of WhatsApp voice messages received through the [WhatsApp Business API] (https://www.whatsapp.com/business/api)
+One use for this project is the transcription of WhatsApp voice messages received through the [WhatsApp Business API](https://www.whatsapp.com/business/api)
 
 To make this sample work, you need the [Cognitive Services Speech Service Java SDK](https://docs.microsoft.com/en-us/java/api/com.microsoft.cognitiveservices.speech?view=azure-java-stable) which has been already added to the pom file.
 ```java
